@@ -5,9 +5,11 @@ const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const port = process.env.PORT || 5000;
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static("public"));
 
 app.get('/', (req, res) => {
   res.send("Hello Word")
@@ -49,6 +51,7 @@ async function run() {
     const services = database.collection("allServices");
     const order = database.collection("allOrders");
     const reviewCollection = database.collection("allReviews");
+    const paymentCollection = database.collection("payments");
 
     //JWT api
     app.post('/jwt', async(req, res) =>{
@@ -181,6 +184,28 @@ async function run() {
       await client.connect();
       const result = await reviewCollection.find().toArray();
       res.send(result);
+    })
+
+    ///Payment Method Intent
+    app.post('/create-payment-intent', async(req, res) =>{
+      const {price} = req.body;
+      const amount = price * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+    //Payment API
+    app.post('/payments', async(req, res) =>{
+      await client.connect();
+      const payment = req.body;
+      const result = await paymentCollection.insertOne(payment);
+      res.send(result)
     })
    
 
